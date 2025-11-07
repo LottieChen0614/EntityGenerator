@@ -33,3 +33,4 @@ Thumbs.db
 # Packages folder can be ignored if using PackageReference
 packages/
 
+EntityGenerator.sln
