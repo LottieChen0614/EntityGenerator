@@ -1,0 +1,35 @@
+# .gitignore for EntityGenerator (.NET Core)
+
+# Build results
+bin/
+obj/
+
+# User-specific files
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# Visual Studio Code
+.vscode/
+
+# OS generated files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Others
+*.vspscc
+*.vssscc
+
+# Rider
+.idea/
+*.sln.iml
+
+# NuGet
+*.nupkg
+# Packages folder can be ignored if using PackageReference
+packages/
+
