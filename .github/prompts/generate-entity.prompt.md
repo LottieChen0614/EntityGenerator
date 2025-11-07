@@ -1,6 +1,6 @@
 ---
 mode: 'agent'
-model: 'GPT-4.1'
+model: 'Claude Sonnet 4.5'
 description: '透過 C# 工具解析 .xlsx 檔案後，自動生成 ASP.NET Core Entity 類別及 DbSet 註冊程式碼'
 ---
 
@@ -12,7 +12,8 @@ description: '透過 C# 工具解析 .xlsx 檔案後，自動生成 ASP.NET Core
 2. 接收並解析工具輸出的 JSON 資料（包含所有實體的完整定義）
 3. 根據 JSON 資料逐一生成每個實體檔案
 4. 最後生成 DbContext 的 DbSet 註冊程式碼
-5. 檢查所有生成的檔案是否使用 UTF-8 with BOM 編碼格式
+5. 檢查所有生成的檔案是否有編譯錯誤，通常是 `<summary>` 或 `<example>` 標籤所致
+6. 檢查所有生成的檔案是否使用 UTF-8 with BOM 編碼格式
 
 ## 輸入資訊
 - **Excel檔案路徑**: ${input:filePath:請貼上完整的.xlsx文件連結}
@@ -119,17 +120,10 @@ dotnet run --project "Tools/EntityGenerator" -- "D:/Database_Design.xlsx" --json
 ```
 正在分析實體：{Description}
 - Sheet 名稱: {SheetName}
-- FolderName: {FolderName}
-- ModuleName: {ModuleName}
-- DetailName: {DetailName}（如果是表身）
-- Prefix: {Prefix}（已從 JSON 取得）
 - 檔案名稱: {FileName}（已從 JSON 取得）
 - 檔案路徑: {FilePath}（已從 JSON 取得）
-- 主鍵型別: {PrimaryKeyField.CSharpType}（已從 JSON 取得）
 - 是否為表身: {IsDetail}（已從 JSON 取得）
-業務欄位：
-  - {欄位名稱} ({C#型別}{可為null?}) - {說明}
-  - ...
+業務欄位：共 {BusinessFields.Count} 個
 ```
 
 2. **生成 Entity 檔案**：
@@ -157,6 +151,7 @@ CEntityContext 檔案路徑: `NET_Core_API/Entity_Model/Entity/CEntityContext.cs
   - 若 `region ${FolderName}相關` 不存在，則建立 `region ${FolderName}相關` 區塊
   - 新增 Entity 對應的 DbSet 屬性
   - 需與前一個 DbSet 相隔一行空白以符合 StyleCop
+  - 注意縮排位置予以存在的 DBSet 對齊
   - 根據 Entity 的 namespace 引用命名空間
 
 #### DbSet 註冊程式碼格式
@@ -177,7 +172,11 @@ CEntityContext 檔案路徑: `NET_Core_API/Entity_Model/Entity/CEntityContext.cs
 
 記住：每個 DbSet 之間空一行（StyleCop 規範）。
 
-### 步驟 5: 檢查是否所有生成的檔案皆使用 UTF-8 with BOM 編碼格式
+### 步驟 5: 檢查所有生成的檔案是否有編譯錯誤
+1. 檢查所有生成的檔案是否有編譯錯誤
+2. 若有錯誤請修正
+
+### 步驟 6: 檢查是否所有生成的檔案皆使用 UTF-8 with BOM 編碼格式
 1. 列出檢查清單
 2. 使用 powershell 指令一次檢查所有檔案路徑是否使用 UTF-8 with BOM 編碼格式
 3. 若有非 UTF-8 with BOM 編碼格式的檔案，請立即轉換
@@ -268,14 +267,16 @@ namespace Entity_Model.Entity.{FolderName}.{ModuleName}
 /// </summary>
 /// <example>{Example}</example>
 [Column("{Column Name}", TypeName = {TypeName})]
-[Comment("{Comment}「{CommentExtra}」")]
+[Comment("{Comment}：「{CommentExtra}」")]
 public {C#型別}{?} {Column Name} { get; set; }
 ```
 
 **重要**：
 - 欄位的 `cSharpType`、`typeName`、`isNullable` 已由 C# 工具計算完成，直接使用即可。
 - 一定要包含完整的 XML 註解，包含 `<example>` 標籤。
-- 若 json 的 `example` 欄位為空字串，則 `<example>` 標籤內容請根據型態自行填寫。
+- 若 json 的 `example` 欄位為空字串，則 `<example>` 標籤內容請根據「型態(如 `string`)」自行填寫適當範例值。
+- 除了外來鍵欄位外，其他欄位**不要**由 region 包覆，例如不要 `#region 業務欄位` 。
+- `summary` 中的 `{Comment}` 不要包含 `commentExtra` 內容。
 
 **字串型別初始化規則**：
 - 如果欄位型別是 `string`（必填，不可為 null），必須加上 `= string.Empty;`
@@ -421,19 +422,10 @@ C# 工具輸出的 JSON 格式如下：
 ========================================
 正在分析實體：保養項目
 - Sheet 名稱: Bga_Maintenance(保養項目)
-- FolderName: Bga
-- ModuleName: Maintenance
-- Prefix: Maint（已從 JSON 取得）
 - 檔案名稱: CTab_BgaMaintenance.cs（已從 JSON 取得）
 - 檔案路徑: NET_Core_API/Entity_Model/Entity/Bga/Maintenance/（已從 JSON 取得）
-- 主鍵型別: long（已從 JSON 取得）
 - 是否為表身: false（已從 JSON 取得）
-業務欄位：
-  - Maint_Name (string) - 保養項目名稱
-  - ...
-建立者/異動者欄位：
-  - Maint_CreateId (Guid) - 建立者ID
-  - ...
+業務欄位：共 2 個
 
 [生成檔案...]
 
@@ -445,13 +437,8 @@ C# 工具輸出的 JSON 格式如下：
 ========================================
 正在分析實體：維修單-維修內容
 - Sheet 名稱: Bga_Fix_Material(維修單-維修內容)
-- FolderName: Bga
-- ModuleName: Fix
-- DetailName: Material
-- Prefix: FixMaterial（已從 JSON 取得）
 - 檔案名稱: CTab_BgaFixMaterial.cs（已從 JSON 取得）
 - 檔案路徑: NET_Core_API/Entity_Model/Entity/Bga/Fix/（已從 JSON 取得）
-- 主鍵型別: Guid（已從 JSON 取得）
 - 是否為表身: true（已從 JSON 取得）
 - 關聯表頭: CTab_BgaFix
 - 外鍵欄位: Fk_Fix（已從 JSON 取得）
@@ -477,112 +464,9 @@ C# 工具輸出的 JSON 格式如下：
    - 業務欄位（使用 `businessFields` 陣列）
    - 建立者欄位（使用 `creatorFields` 陣列）
    - 異動者欄位（使用 `editorFields` 陣列）
+8. **XML 註解**：
+   - 每個欄位都必須包含完整的 XML 註解
+   - 包含 `<summary>` 和 `<example>` 標籤
+   - `<example>` 不能為空，請根據「型態(如 `string`)」自行填寫適當範例值
 
 ---
-
-## 附錄：Excel 格式參考（供理解 JSON 來源）
-
-以下資訊已由 C# 工具自動處理，AI agent 僅需理解 JSON 輸出即可。
-
-### Sheet 命名規則
-
-Sheet 名稱格式：`{FolderName}_{ModuleName}({Description})`
-
-**範例**：
-- `Bga_Maintenance(保養項目)`
-  - FolderName: `Bga`
-  - ModuleName: `Maintenance`
-  - Description: `保養項目`
-
-- `Bga_Fix_Material(維修單-維修內容)`
-  - FolderName: `Bga`
-  - ModuleName: `Fix`
-  - DetailName: `Material`
-  - Description: `維修單-維修內容`
-
-**解析規則**：
-1. 底線 `_` 左邊 = FolderName
-2. 底線 `_` 右邊（括號前）= ModuleName 或 ModuleName_DetailName
-3. 括號 `()` 內 = Description
-4. 如果有兩個底線（如 `Bga_Fix_Material`），第二個底線後的部分是 DetailName（表身）
-
-### Prefix 提取規則
-
-Prefix 從欄位名稱中提取：
-- 欄位名稱格式：`{Prefix}_{FieldName}`
-- 取第一個底線前的部分作為 Prefix
-- 範例：
-  - `Maint_Name` → Prefix = `Maint`
-  - `Material_Code` → Prefix = `Material`
-  - `Fix_Date` → Prefix = `Fix`
-
-**特殊欄位的 Prefix**：
-- 主鍵欄位（如 `Pk_Maint`）→ 提取 `Pk_` 後面的部分 = `Maint`
-- 取第一個非主鍵業務欄位的 Prefix
-
-### SQL Server 到 C# 型別對應
-
-C# 工具已自動處理型別轉換，JSON 中的 `cSharpType` 和 `typeName` 欄位已包含轉換結果。
-
-#### 主鍵型別判斷
-
-根據主鍵欄位的 SQL 型別自動判斷：
-- **bigint** → C# Type: `long`, TypeName: `PropertyConfig.TableID`
-- **nvarchar(N)** → C# Type: `string`, TypeName: `"nvarchar(N)"`（字串主鍵不使用 PropertyConfig）
-
-主鍵固定使用 `[DatabaseGenerated(DatabaseGeneratedOption.None)]` 關閉自動編號。
-
-#### 資料型別對應表
-
-| SQL Server Type | C# Type | Column TypeName | 適用範圍 | 備註 |
-|----------------|---------|-----------------|---------|------|
-| bigint | long | PropertyConfig.TableID | 主鍵、建立者/異動者 ID | 僅主鍵及系統欄位可用 PropertyConfig |
-| bigint | long | "bigint" | 業務欄位 | 一般長整數 |
-| datetime | long | PropertyConfig.TableTime | 建立者/異動者 Date | 僅系統欄位可用 PropertyConfig |
-| datetime | long | "bigint" | 業務欄位 | 時間轉 Ticks，使用 "bigint" |
-| nvarchar(30) | string | PropertyConfig.TableIP | 建立者/異動者 IP | 僅系統欄位可用 PropertyConfig |
-| nvarchar(30) | string | "nvarchar(30)" | 業務欄位 | 一般短文字 |
-| nvarchar(50) | string | "nvarchar(50)" | 業務欄位 | 短文字 |
-| nvarchar(100) | string | PropertyConfig.TableCode | 建立者/異動者 Code | 僅系統欄位可用 PropertyConfig |
-| nvarchar(100) | string | "nvarchar(100)" | 業務欄位 | 代碼、帳號等 |
-| nvarchar(N) | string | "nvarchar(N)" | 業務欄位 | 一般文字，N 為實際長度 |
-| nvarchar(1) | string | "character(1)" | 業務欄位 | 狀態欄位 |
-| int | int | "int" | 業務欄位 | 整數 |
-| decimal | decimal | "decimal(18,2)" | 業務欄位 | 金額 |
-| bit | bool | "bit" | 業務欄位 | 布林值 |
-
-#### TypeName 智能判斷邏輯
-
-**重要原則**：PropertyConfig 僅可用於主鍵及建立者/異動者 8 個欄位，業務欄位一律使用字串型別。
-
-1. **主鍵欄位**
-   - SQL: `bigint` → TypeName: `PropertyConfig.TableID`
-   - SQL: `nvarchar(任何長度)` → TypeName: `"nvarchar(長度)"`（字串主鍵保持原型別）
-
-2. **建立者/異動者欄位（8 個系統欄位）**
-   - `{Prefix}_CreateId` / `{Prefix}_EditId` → TypeName: `PropertyConfig.TableID`
-   - `{Prefix}_CreateCode` / `{Prefix}_EditCode` → TypeName: `PropertyConfig.TableCode`
-   - `{Prefix}_CreateDate` / `{Prefix}_EditDate` → TypeName: `PropertyConfig.TableTime`
-   - `{Prefix}_CreateIp` / `{Prefix}_EditIp` → TypeName: `PropertyConfig.TableIP`
-
-3. **業務欄位**
-   - SQL: `uniqueidentifier` → TypeName: `"uniqueidentifier"`
-   - SQL: `bigint` → TypeName: `"bigint"`
-   - SQL: `datetime` → C# Type: `long`, TypeName: `"bigint"`
-   - SQL: `nvarchar(1)` → TypeName: `"character(1)"`（狀態欄位）
-   - SQL: `nvarchar(N)` → TypeName: `"nvarchar(N)"`
-   - SQL: `int` → TypeName: `"int"`
-   - SQL: `decimal(18,2)` → TypeName: `"decimal(18,2)"`
-   - SQL: `bit` → TypeName: `"bit"`
-
-4. **外鍵欄位（主鍵欄位的一種）**
-   - 即使欄位名包含 `FK_` 或 `Fk_` 或 `CFK_`，按主鍵欄位規則處理
-   - SQL: `bigint` → TypeName: `"PropertyConfig.TableID"`
-   - SQL: `nvarchar(任何長度)` → TypeName: `"nvarchar(長度)"`（字串主鍵保持原型別）
-
-#### 可為 null 判斷
-
-- **Required = 1** → 不可為 null（C# 型別不加 `?`）
-- **Required = 0 或空** → 可為 null（C# 型別加 `?`）
-- **例外**：建立者 4 個欄位強制必填
-- **例外**：異動者 4 個欄位強制非必填
