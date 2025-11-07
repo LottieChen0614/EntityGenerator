@@ -172,10 +172,16 @@ public class EntityFileGenerator
 
         // Column 屬性
         sb.AppendLine($"        [Column(\"{field.Name}\", TypeName = {field.TypeName})]");
-        sb.AppendLine($"        [Comment(\"{field.Comment}\")]");
+
+        // Comment 屬性：如果有 CommentExtra 才加上
+        var commentText = string.IsNullOrEmpty(field.CommentExtra)
+            ? field.Comment
+            : $"{field.Comment}：「{field.CommentExtra}」";
+        sb.AppendLine($"        [Comment(\"{commentText}\")]");
 
         // 屬性定義
-        var nullableSign = field.IsNullable && field.CSharpType != "string" ? "?" : "";
+        // 根據 IsNullable 決定是否加 ?（包括 string）
+        var nullableSign = field.IsNullable ? "?" : "";
         var defaultValue = GetDefaultValue(field);
 
         sb.AppendLine($"        public {field.CSharpType}{nullableSign} {field.Name} {{ get; set; }}{defaultValue}");
